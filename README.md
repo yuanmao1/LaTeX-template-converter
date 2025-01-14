@@ -1,2 +1,2 @@
 # LaTeX-template-converter
-Change your latex academic article into a template for another journal article
+Convert your LaTeX academic article to a different journal article template
