@@ -11,7 +11,7 @@ from function import *
 
 # 选择需要被修改的文件夹路径
 
-# 由于这里我想把CVPR 2022模板作为我需要被修改的latex文件，把NeurIPS 2024模板作为目标模板，我直接选择了这两个模板的文件夹
+# 由于这里我想把CVPR 2022模板作为我需要被修改的latex文件，把ECCV 2016模板作为目标模板，我直接选择了这两个模板的文件夹
 # 如果你想要放你的文件夹和别的目标模板的话，你也可以自行修改下面的两行代码为：
 # your_work_folder = './your_work_to_be_converted'
 # target_template_folder = './target_converted_template'
@@ -180,83 +180,7 @@ add_custom_macros_before_document(yourwork_main_tex)
 # bug 6:
 # sty包受到大小写影响，比如emnlp2023.sty，要删掉\usepackage[review]{EMNLP2023}，因为大写所以没删成功
 
-# ------------------------------
-# 未完成的debug
-
-# bug 1:
-# 改到NeurIPS 2024模板要把bibstyle改成\bibliographystyle{rusnat}，或者其他natbib兼容的格式
-
-# bug 2:
-# bib的\cite错误，解决方法：
-# 删掉bbl文件，进入bib文件保存一下，再到tex中编译就可以了
-
-# ------------------------------
-# 测试日志：
-
-# 测试1:
-# your_work_folder = './NeurIPS 2024'
-# target_template_folder = './ECCV 2016'
-# \ack环境未定义，删了就行
-
-# 测试2:
-# your_work_folder = './ECCV 2016'
-# target_template_folder = './NeurIPS 2024'
-# 删掉institute、keyword
-# 改成\bibliographystyle{rusnat}
-
-# 测试3:
-# your_work_folder = './ECCV 2016'
-# target_template_folder = './CVPR 2022'
-#（已完成） \begin{document}前加入\usepackage[OT1]{fontenc} 
-# （已完成）复制.bst文件过来 
-
-# 测试4:
-# your_work_folder = './CVPR 2022'
-# target_template_folder = './ECCV 2016'
-# （已完成）删除原本的.sty文件
-# （已完成）subfigure出现bug，加入\usepackage{subcaption}
-# （已完成）\eg等出现bug，加入def
-
-# 测试5:
-# your_work_folder = './NeurIPS 2024'
-# target_template_folder = './CVPR 2022'
-# ack的问题
-
-# 测试6:
-# your_work_folder = './CVPR 2022'
-# target_template_folder = './NeurIPS 2024'
-# （已完成）删除后一个hyperref
-# 改成\bibliographystyle{rusnat}
-# bib的格式错误，进入bib文件保存一下，再到tex中编译就可以了
-
-# 测试 7:
-# your_work_folder = './CVPR 2022'
-# target_template_folder = './EMNLP 2023'
-# 删掉hyperref和\pdfoutput=1
-# 删掉bbl，到bib保存再跑
-
-# 测试 8:
-# your_work_folder = './EMNLP 2023'
-# target_template_folder = './CVPR 2022'
-# （已完成）修改因sty文件名删除包的大小写不敏感问题
-# 把报错的cite都注释掉就可以跑了，其实是要把cite...改成正规的cite或citep这种格式
-
-# ------------------------------
-# 结论：目前还不支持ICML
-
-# 测试 8:
-# your_work_folder = './ECCV 2016'
-# target_template_folder = './ICML 2021'
-
-# 这个ICML不是按照title，author，maketitle来写的
-# 逻辑：如果目标模板没有找到\title,\author,\maketitle，就先把\author,title,maketitle给注释掉，\make{document}前面的东西贴到最前面，把\make{document}后面的东西贴到\make{document}之后，然后title之类的要手动改
-
-# 如果自己没有maketitle，...
-
-
-
-
-# ------------------------------
+# -----------------------------
 
 # converted_result文件夹中的内容就是修改格式完成后的结果
 # 如果你的电脑安装了模糊编译latex文件的插件，此时在converted_result中的pdf文件就是修改完的tex文件编译后的pdf
