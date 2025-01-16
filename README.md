@@ -13,9 +13,9 @@ Replace the following two folder paths with the folder of your LaTeX article and
 
 After running the Python code, the contents of the `converted_result` folder will contain the formatted output.
 
-If the PDF is not successfully compiled, please try running the program again (this could be a LaTeX bug).
+After running the Python code, the contents in the `converted_result` folder will be the result of the format modification.
 
-Alternatively, you can open the `.tex` files in the `converted_result` folder, comment out all the red errors, and then compile the `.tex` file.
+Open the `.tex` file in the `converted_result` folder for compilation. Comment out all the red error sections, then delete the `.bbl` file. Finally, compile the `.tex` file twice to obtain the desired `.pdf`.
 
 ---
 
@@ -28,9 +28,7 @@ Alternatively, you can open the `.tex` files in the `converted_result` folder, c
 
 运行 Python 代码后，`converted_result` 文件夹中的内容将是格式修改后的结果。
 
-如果未能成功编译并生成 PDF 文件，请尝试重新运行程序（可能是 LaTeX 自身的问题）。
-
-或者，你也可以打开 `converted_result` 文件夹中的 `.tex` 文件，注释掉所有红色错误部分后，再编译该 `.tex` 文件。
+打开 `converted_result` 文件夹中的 `.tex` 文件进行编译，注释掉所有红色错误部分后，删除`.bbl`文件，再编译两次 `.tex` 文件，即能得到你想要的`.pdf`。
 
 ---
 
@@ -115,6 +113,12 @@ add_custom_macros_before_document(yourwork_main_tex)
 ### Bug 6:
 
 （已完成，在 `.sty` 改动函数中已修改）`sty` 包受到大小写影响，比如 `emnlp2023.sty`，要删掉 `\usepackage[review]{EMNLP2023}`，因为大写所以没删成功。
+
+
+
+### Bug 7:
+
+（已完成，在 `.bib` 改动函数中已修改）若被修改的latex文件夹中不包含`.bib`文件，会自动新建一个新的`yourbib.bib`文件并引用目标模板的引用格式，以供用户放入bibtex参考文献。由于空的`.bib`文件会在tex文件中报错：“没有检测到任何引用”，故而在新建的.bib文件中添加了参考引用，并在文章末尾加入了一句标注应删去的引用语句。
 
 ------
 
