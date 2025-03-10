@@ -442,34 +442,15 @@ def modify_bibliography(tex_file_path, target_bibliographystyle):
             end_document_line = i
 
     # 如果没有找到 \bibliographystyle{...}，就需要插入
-    # 如果没有找到 \bibliographystyle{...}，就需要插入
     if bibliographystyle_line is None and end_document_line:
         # 在 \end{document} 之前插入 \bibliographystyle 和 \bibliography
         lines.insert(end_document_line - 1, f"\\bibliographystyle{{{target_bibliographystyle}}}\n")
         lines.insert(end_document_line, "\\bibliography{yourbib}\n")
-    
-        # 创建并写入内容到 yourbib.bib 文件
-        bib_content = """@article{test:citation,
-  author  = {test citation},
-  year    = {2025},
-  title   = {test citation},
-  journal = {test citation},
-  volume  = {1},
-  number  = {1},
-  pages   = {1-10},
-  doi     = {11.1111/111111.111111}
-}
-"""
+        # 创建一个空的 yourbib.bib 文件
         with open(os.path.join(os.path.dirname(tex_file_path), 'yourbib.bib'), 'w', encoding='utf-8') as bib_file:
-            bib_file.write(bib_content)
-    
-        # 在 \end{document} 前插入测试引用句
-        lines.insert(end_document_line - 1, "this is a test citation, please delete it\\cite{test:citation}\n")
-    
+            bib_file.write("% Please add references to yourbib.bib file\n")
         print(f"已在 \\end{{document}} 之前插入 \\bibliographystyle{{{target_bibliographystyle}}} 和 \\bibliography{{yourbib}}")
-        print("已创建 yourbib.bib 文件，并添加了测试引用文献")
-        print("已在 \\end{document} 之前插入测试引用句，请删除它")
-    
+        print("已创建了一个空的yourbib.bib文件，请放入你的引用文献")
     
     # 如果找到 \bibliographystyle{...}，进行修改
     elif bibliographystyle_line is not None:

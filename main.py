@@ -6,6 +6,7 @@ import tempfile
 from shutil import rmtree
 # 引入函数
 from function import *
+from targetTemplateMainTexMapping import target_template_main_tex_mapping  # 导入字典
 
 # 在总文件夹中，有很多个从外部下载下来的期刊latex模板作为例子
 # 你可以新建一个文件夹来放你需要被修改的latex文件，例如可以给这个文件夹起名叫做your_work_to_be_converted
@@ -19,7 +20,7 @@ from function import *
 # target_template_folder = './target_converted_template'
 
 # your_work_folder = './CVPR 2022'
-# target_template_folder = './ECCV 2016'
+# target_template_folder = './'
 
 
 # 解压zip文件并删除 macOS 特有的 __MACOSX 文件夹
@@ -74,7 +75,7 @@ def delete_existing_zip(zip_path='./converted_result.zip'):
         print(f"没有找到文件: {zip_path}")
 
 # 把整个python文件封装成一个函数以便调用
-def process_latex_files(source_zip, template_zip):
+def process_latex_files(source_zip, template_zip, main_tex_file=None):
     # 解压源文件和目标模板的.zip文件
     your_work_folder = extract_zip(source_zip)
     target_template_folder = extract_zip(template_zip)
@@ -102,26 +103,55 @@ def process_latex_files(source_zip, template_zip):
     # 检查需修改的latex文件夹中是否有.tex文件
     if not yourwork_tex_files:
         print("需修改的文件夹中没有 .tex 文件！")
-    else:
-        if len(yourwork_tex_files) > 1:
-            print(f"需修改的文件夹中有 {len(yourwork_tex_files)} 个.tex文件：")
-            yourwork_main_tex = choose_main_tex_file(yourwork_tex_files)
-            print(f"选择的需修改的主文件: {yourwork_main_tex}\n")
-        else:
-            yourwork_main_tex = yourwork_tex_files[0]
-            print(f"需修改的文件夹中只有一个.tex文件，自动选择: {yourwork_main_tex}\n")
+    # 如果只有一个 .tex 文件，自动选择
+    elif len(yourwork_tex_files) == 1:
+        yourwork_main_tex = yourwork_tex_files[0]
+        print(f"需修改的文件夹中只有一个.tex文件，自动选择: {yourwork_main_tex}\n")
+    # 如果有多个 .tex 文件
+    elif len(yourwork_tex_files) > 1:
+        # 如果提供了 main_tex_file，尝试找到匹配的文件
+        if main_tex_file:
+            main_tex_filename = os.path.basename(main_tex_file)
+            matching_tex_files = [file for file in yourwork_tex_files if os.path.basename(file) == main_tex_filename]
 
-    # 检查目标模板是否有.tex文件
+            if matching_tex_files:
+                yourwork_main_tex = matching_tex_files[0]
+                print(f"用户选择的主文件: {yourwork_main_tex}\n")
+            else:
+                print(f"错误：找不到名为 {main_tex_filename} 的 .tex 文件，请检查文件名是否正确。\n")
+        # 如果没有提供 main_tex_file，且有多个文件，报错
+        else:
+            print("错误：需修改的文件夹中有多个 .tex 文件，请手动指定主文件。\n")
+
+
+    # 检查目标模板是否有 .tex 文件
     if not target_tex_files:
         print("目标模板文件夹中没有 .tex 文件！")
     else:
+        # 如果目标模板文件夹中有多个 .tex 文件
         if len(target_tex_files) > 1:
-            print(f"目标模板文件夹中有 {len(target_tex_files)} 个.tex文件：")
-            target_main_tex = choose_main_tex_file(target_tex_files)
-            print(f"选择的目标模板主文件: {target_main_tex}\n")
+            print(f"目标模板文件夹中有 {len(target_tex_files)} 个 .tex 文件：")
+
+            # 从字典中查找目标模板名称对应的主 .tex 文件
+            template_name = os.path.basename(template_zip)  # 获取模板名称（去掉路径部分）
+            if template_name in target_template_main_tex_mapping:
+                # 获取字典中对应的主tex文件名
+                target_main_tex = target_template_main_tex_mapping[template_name]
+                
+                # 检查目标模板文件夹中是否包含这个文件
+                matching_tex_files = [file for file in target_tex_files if os.path.basename(file) == target_main_tex]
+                if matching_tex_files:
+                    target_main_tex = matching_tex_files[0]
+                    print(f"自动选择的目标模板主文件: {target_main_tex}\n")
+                else:
+                    print(f"错误: 字典中指定的主文件 {target_main_tex} 未在目标模板文件夹中找到。\n")
+            else:
+                print(f"错误: 字典中找不到与模板 {template_name} 对应的主 .tex 文件。\n")
+        # 如果目标模板文件夹只有一个 .tex 文件
         else:
             target_main_tex = target_tex_files[0]
-            print(f"目标模板文件夹中只有一个.tex文件，自动选择: {target_main_tex}\n")
+            print(f"目标模板文件夹中只有一个 .tex 文件，自动选择: {target_main_tex}\n")
+
 
     # 至此，我们已经新建了副本文件夹作为工作区，并找到了需修改和目标模板文件夹中的tex文件，下面我们需要对工作区中的tex文件内容进行一些修改
     # 做以下修改顺序的操作是为了分开\maketitle的部分和论文最开头定义排版格式的部分

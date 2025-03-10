@@ -1,0 +1,78 @@
+
+\documentclass[runningheads]{llncs}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb} % define this before the line numbering.
+\usepackage{ruler}
+\usepackage{color}
+\usepackage[width=122mm,left=12mm,paperwidth=146mm,height=193mm,top=12mm,paperheight=217mm]{geometry}
+
+\pagestyle{headings}
+\mainmatter
+\def\ECCV16SubNumber{***}  % Insert your submission number here
+
+ % Replace with your title
+
+\titlerunning{ECCV-16 submission ID \ECCV16SubNumber}
+
+\authorrunning{ECCV-16 submission ID \ECCV16SubNumber}
+
+
+
+
+
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+\def\paperID{*****} % *** Enter the Paper ID here
+\def\confName{CVPR}
+\def\confYear{2025}
+\usepackage[OT1]{fontenc}
+\usepackage{subcaption}
+\pdfstringdefDisableCommands{%
+  \def\\{}%
+  \def\texttt#1{<#1>}%
+}%
+\def\onedot{.} % 定义 \onedot 为句点
+% 定义缩写命令
+\def\eg{\emph{e.g}\onedot}
+\def\Eg{\emph{E.g}\onedot}
+\def\ie{\emph{i.e}\onedot}
+\def\Ie{\emph{I.e}\onedot}
+\def\cf{\emph{cf}\onedot}
+\def\Cf{\emph{Cf}\onedot}
+\def\etc{\emph{etc}\onedot}
+\def\vs{\emph{vs}\onedot}
+\def\wrt{w.r.t\onedot}
+\def\dof{d.o.f\onedot}
+\def\iid{i.i.d\onedot}
+\def\wolog{w.l.o.g\onedot}
+\def\etal{\emph{et al}\onedot}
+\begin{document}
+
+\title{\LaTeX\ Author Guidelines for \confName~Proceedings}
+
+\author{First Author\\
+Institution1\\
+Institution1 address\\
+{\tt\small firstauthor@i1.org}
+\and
+Second Author\\
+Institution2\\
+First line of institution2 address\\
+{\tt\small secondauthor@i2.org}
+}
+\maketitle
+\input{sec/0_abstract}    
+\input{sec/1_intro}
+\input{sec/2_formatting}
+\input{sec/3_finalcopy}
+{
+    \small
+\bibliographystyle{splncs}
+    \bibliography{main}
+}
+
+% WARNING: do not forget to delete the supplementary pages from your submission 
+% \input{sec/X_suppl}
+
+\end{document}
