@@ -75,7 +75,7 @@ def delete_existing_zip(zip_path='./converted_result.zip'):
         print(f"没有找到文件: {zip_path}")
 
 # 把整个python文件封装成一个函数以便调用
-def process_latex_files(source_zip, template_zip, main_tex_file=None):
+def process_latex_files(source_zip, template_zip, main_tex_file=None, selected_template=None):
     # 解压源文件和目标模板的.zip文件
     your_work_folder = extract_zip(source_zip)
     target_template_folder = extract_zip(template_zip)
@@ -284,12 +284,35 @@ def process_latex_files(source_zip, template_zip, main_tex_file=None):
     # bib的\cite错误，解决方法：
     # 删掉bbl文件，进入bib文件保存一下，再到tex中编译就可以了
 
-    # 最终将处理结果压缩为一个zip文件
-    zip_output_path = './converted_result.zip'
+        # 获取source_zip和template_zip的前5个字符
+    # # source_prefix = source_zip[:5]
+    # # template_prefix = template_zip[:5]
+
+    # # 最终将处理结果压缩为一个zip文件
+    # zip_output_path = './converted_result.zip'
+    # # zip_output_path = f'./{source_prefix}To{template_prefix}_converted_result.zip'
+    # zip_folder(converted_result_folder, zip_output_path)
+
+    # return zip_output_path  # 返回处理好的zip文件路径
+
+    # 获取文件的名称
+    source_zip_name = source_zip.name if hasattr(source_zip, 'name') else 'source_zip'  # 获取源文件的文件名
+    template_zip_name = selected_template  # 获取模板文件的文件名
+
+    print(selected_template)
+    print(template_zip_name)
+
+    # 获取文件名的前五个字符
+    source_prefix = source_zip_name[:5]
+    template_prefix = template_zip_name[:5]  # 直接使用 selected_template
+
+    # 构建新的压缩文件名
+    zip_output_path = f'./{source_prefix} To {template_prefix} result.zip'
+
+    # 调用压缩函数
     zip_folder(converted_result_folder, zip_output_path)
 
     return zip_output_path  # 返回处理好的zip文件路径
-
 
 
 

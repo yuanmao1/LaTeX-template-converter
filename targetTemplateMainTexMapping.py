@@ -1,6 +1,6 @@
 # 模板文件与主tex文件的映射
 target_template_main_tex_mapping = {
-    "ACM Conference Proceedings Standard Template": "sample-sigconf-xelatex.tex", 
+    "ACM Conference Proceedings Standard Template.zip": "sample-sigconf-xelatex.tex", 
     "ACM Journals Primary Article Template.zip": "sample-manuscript.tex",  
     "CLOUD 2025.zip": "conference_101719.tex", 
     "CVPR 2022.zip": "PaperForReview.tex",  
@@ -16,4 +16,6 @@ target_template_main_tex_mapping = {
     "SC 2025.zip": "sc--vis-showcase-template.tex", 
 
     # 继续为其他模板添加主文件映射
+
 }
+

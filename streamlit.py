@@ -11,6 +11,7 @@ from main import process_latex_files
 
 # 预设模板文件夹
 TEMPLATE_FOLDER = "./templates"
+MAPPING_FILE = "targetTemplateMainTexMapping.py"
 
 def get_available_templates():
     """获取 `./templates` 目录下所有的 .zip 模板文件"""
@@ -61,6 +62,23 @@ def capture_output(func, *args, **kwargs):
     finally:
         sys.stdout = sys.__stdout__  # 还原标准输出
 
+# 更新 targetTemplateMainTexMapping.py 文件
+def add_template_to_mapping(full_template_name, main_tex_name):
+    # 读取现有内容
+    with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # 查找字典的结尾位置
+    for i, line in enumerate(lines):
+        if line.strip() == "}":  # 字典的结尾部分
+            # 在字典结束符号前插入新的映射
+            lines.insert(i, f'    "{full_template_name}": "{main_tex_name}",\n')
+            break
+    
+    # 重新写回文件
+    with open(MAPPING_FILE, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
 def main():
     st.title("LaTeX模板转换工具")
     
@@ -77,32 +95,19 @@ def main():
     tex_files = []
 
     if uploaded_source_zip:
-        # 选择 LaTeX 结构类型
-        latex_type = st.radio("请选择您上传的LaTex文件的结构类型", ["单一tex文件", "多个tex文件"])
-
-        if latex_type == "多个tex文件":
-            tex_files, extracted_temp_dir = get_tex_files_from_zip(uploaded_source_zip)
-            
-            if tex_files:
-                # 按钮用于显示下拉菜单
-                if st.button("选择主tex文件"):
-                    st.session_state.show_tex_selector = True
-
-                # 如果用户点击过按钮，则显示下拉菜单
-                if st.session_state.show_tex_selector:
-                    # 更新选择的tex文件
-                    st.session_state.main_tex_file = st.selectbox(
-                        "请选择主tex文件", tex_files, index=tex_files.index(st.session_state.main_tex_file) if st.session_state.main_tex_file in tex_files else 0
-                    )
-            else:
-                st.error("ZIP 文件中未找到 .tex 文件，请检查内容。")
-        else:
-            # 如果是单一 tex 文件，直接设定为该文件
-            tex_files = get_tex_files_from_zip(uploaded_source_zip)[0]
-            if tex_files:
+        tex_files, extracted_temp_dir = get_tex_files_from_zip(uploaded_source_zip)
+        
+        if tex_files:
+            # 如果只有一个 .tex 文件，则直接设置主 tex 文件
+            if len(tex_files) == 1:
                 st.session_state.main_tex_file = tex_files[0]
             else:
-                st.error("ZIP 文件中未找到 .tex 文件，请检查内容。")
+                # 如果有多个 .tex 文件，直接显示下拉菜单
+                st.session_state.main_tex_file = st.selectbox(
+                    "请选择您上传文件的主tex文件", tex_files, index=tex_files.index(st.session_state.main_tex_file) if st.session_state.main_tex_file in tex_files else 0
+                )
+        else:
+            st.error("ZIP 文件中未找到 .tex 文件，请检查内容。")
 
     # 选择目标模板（从预设模板中选）
     available_templates = get_available_templates()
@@ -119,7 +124,7 @@ def main():
                 # 调用封装后的函数进行处理
                 # 捕获 process_latex_files() 的输出，并获取生成的 zip 文件路径
                 zip_output_path, output_text = capture_output(
-                    process_latex_files, uploaded_source_zip, template_zip_path, st.session_state.main_tex_file
+                    process_latex_files, uploaded_source_zip, template_zip_path, st.session_state.main_tex_file, selected_template
                 )
                 
                 # 显示下载按钮
@@ -127,7 +132,7 @@ def main():
                     st.download_button(
                         label="下载修改后的 LaTeX 文件压缩包",
                         data=f,
-                        file_name="converted_result.zip",
+                        file_name=os.path.basename(zip_output_path),
                         mime="application/zip"
                     )
                 # 在页面底部显示日志
@@ -137,6 +142,40 @@ def main():
                 st.error(f"处理过程中发生错误: {e}")
         else:
             st.error("请上传源文件压缩包并选择目标模板")
+    
+    st.markdown("---")  # 添加分隔线，使其显示在页面底部
+    st.header("上传新的 LaTeX 模板")
+
+    # 让用户上传模板 zip 文件
+    uploaded_template = st.file_uploader("上传新的模板 (.zip)", type=["zip"])
+
+    # 创建一个短输入框，让用户输入模板名称
+    template_name = st.text_input("输入模板名称", placeholder="模板名称")  # 仅输入名称
+
+
+    # 让用户输入该模板的主 .tex 文件名称
+    main_tex_name = st.text_input("输入该模板的主 .tex 文件名（包括 .tex 后缀）")
+
+    if st.button("上传模板"):
+        if uploaded_template and main_tex_name and template_name:
+            # 确保 templates 文件夹存在
+            os.makedirs(TEMPLATE_FOLDER, exist_ok=True)
+
+            # 拼接完整的模板文件名
+            full_template_name = template_name + ".zip"
+
+            # 保存 zip 文件到 templates 文件夹
+            template_path = os.path.join(TEMPLATE_FOLDER, full_template_name)
+            with open(template_path, "wb") as f:
+                f.write(uploaded_template.getbuffer())
+
+            # 更新 targetTemplateMainTexMapping.py 文件
+            add_template_to_mapping(full_template_name, main_tex_name)
+
+            st.success(f"模板 {full_template_name} 上传成功，主 .tex 文件设为 {main_tex_name}！")
+            st.info("请刷新页面，在下拉菜单中查看新模板。")
+        else:
+            st.error("请上传 .zip 文件，并输入模板名称和主 .tex 文件名！")
 
 if __name__ == "__main__":
     main()
