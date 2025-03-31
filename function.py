@@ -260,29 +260,30 @@ def remove_userpackage_sty_lines(old_template_folder, tex_file_path):
         file.writelines(content)
 
 
-# 在 tex 文件中删除包含 mm 的 \usepackage{...} 语句
-def remove_userpackage_mm_lines(tex_file_path):
+# 在 tex 文件中删除包含 mm 的 \usepackage{...} 语句，改成了以下
+# 在 tex 文件中删除包含 mm 或 cm 的 \usepackage{...} 语句
+def remove_userpackage_mm_cm_lines(tex_file_path):
     # 打开 .tex 文件并读取内容
     with open(tex_file_path, 'r', encoding='utf-8') as file:
         content = file.readlines()
 
-    # 定义匹配模式，查找带有 mm 的 \usepackage{...} 语句
-    # 例如：\usepackage[width=122mm,...]{geometry}
-    package_pattern = r'\\usepackage\[[^\]]*mm[^\]]*\]?\{[^\}]*\}'
+    # 定义匹配模式，查找带有 mm 或 cm 的 \usepackage{...} 语句
+    # 例如：\usepackage[width=122mm,...]{geometry} 或 \usepackage[width=12cm,...]{geometry}
+    package_pattern = r'\\usepackage\[[^\]]*(mm|cm)[^\]]*\]?\{[^\}]*\}'
 
     # 找到所有符合条件的行
     matching_lines = [line for line in content if re.search(package_pattern, line)]
 
     # 删除这些行并打印删除的内容
     if matching_lines:
-        print(f"删除包含mm的包的内容：")
+        print(f"删除包含mm或cm的包的内容：")
         for line in matching_lines:
             print(line.strip())
 
         # 保留未匹配的行
         content = [line for line in content if not re.search(package_pattern, line)]
     else:
-      print("没有删除包含mm的包")
+        print("没有删除包含mm或cm的包")
 
     # 将修改后的内容写回 .tex 文件
     with open(tex_file_path, 'w', encoding='utf-8') as file:

@@ -1,4 +1,5 @@
 # streamlit run streamlit.py
+# 注意，需要安装 pip install streamlit-pdf-viewerß
 
 import streamlit as st
 import os
@@ -7,7 +8,10 @@ import tempfile
 import shutil
 import sys
 import io
+import time
 from main import process_latex_files
+from main import compile_latex
+from streamlit_pdf_viewer import pdf_viewer
 
 # 预设模板文件夹
 TEMPLATE_FOLDER = "./templates"
@@ -142,9 +146,67 @@ def main():
                 st.error(f"处理过程中发生错误: {e}")
         else:
             st.error("请上传源文件压缩包并选择目标模板")
-    
     st.markdown("---")  # 添加分隔线，使其显示在页面底部
-    st.header("上传新的 LaTeX 模板")
+    # 这里开始是pdf review
+    # PDF 预览部分始终显示
+    st.subheader("LaTeX PDF Preview")
+
+    # 确保编译方式选择框也始终可见
+    method = st.selectbox(
+        "选择编译方式",
+        ["pdflatex", "xelatex", "xelatex*2", "xelatex -> bibtex -> xelatex*2"]
+    )
+
+    # 只有在 main_tex_file 存在时才允许 PDF 预览
+    if st.button("显示 PDF Preview"):
+        # 每次点击时清空之前的 PDF 缓存
+        if "pdf_binary_data" in st.session_state:
+            del st.session_state.pdf_binary_data
+
+        if st.session_state.main_tex_file:
+            pdf_path = compile_latex(method, st.session_state.main_tex_file)
+
+            # 调试输出 PDF 生成路径
+            # st.write(f"生成的 PDF 路径: {pdf_path}")
+
+            st.text("正在加载...")
+            time.sleep(5)  # 暂停5秒，也可以改成暂停更久的情况，这是为了以防还没编译出来就直接报错说没pdf的情况
+
+            # 如果 pdf_path 存在，则直接使用它
+            if pdf_path and os.path.exists(pdf_path):
+                st.success("编译成功！")
+            else:
+                # 可能存在部分错误，尝试寻找与 main_tex_file 同名的 PDF
+                folder_path = "./converted_result"  # 确保文件夹路径指向 './converted_result'
+                fallback_pdf_path = os.path.join(folder_path, os.path.splitext(st.session_state.main_tex_file)[0] + ".pdf")
+                # st.write(f"找到 PDF 路径: {fallback_pdf_path}")
+                
+                if os.path.exists(fallback_pdf_path):
+                    st.warning(f"编译有部分报错，初步预览文件如下: ")
+                    pdf_path = fallback_pdf_path  # 使用找到的 PDF
+                else:
+                    st.error(f"编译错误，无法预览。")
+                    pdf_path = None  # 置空，避免错误
+
+            # 如果找到了 PDF 文件，就读取并存储数据
+            if pdf_path and os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as pdf_file:
+                    st.session_state.pdf_binary_data = pdf_file.read()
+
+        # 显示 PDF 预览
+        if "pdf_binary_data" in st.session_state:
+            with st.expander("PDF 预览前两页，点击展开"):
+                pdf_viewer(input=st.session_state.pdf_binary_data, width=700, pages_to_render=list(range(1, 3)))
+
+
+
+
+
+
+
+        
+    st.markdown("---")  # 添加分隔线，使其显示在页面底部
+    st.subheader("上传新的 LaTeX 模板")
 
     # 让用户上传模板 zip 文件
     uploaded_template = st.file_uploader("上传新的模板 (.zip)", type=["zip"])
@@ -176,6 +238,11 @@ def main():
             st.info("请刷新页面，在下拉菜单中查看新模板。")
         else:
             st.error("请上传 .zip 文件，并输入模板名称和主 .tex 文件名！")
+    
+    # --------------
+    # 这里是pdf preview的部分
+
+
 
 if __name__ == "__main__":
     main()

@@ -4,6 +4,8 @@ import os
 import zipfile
 import tempfile
 from shutil import rmtree
+import subprocess
+
 # 引入函数
 from function import *
 from targetTemplateMainTexMapping import target_template_main_tex_mapping  # 导入字典
@@ -200,7 +202,7 @@ def process_latex_files(source_zip, template_zip, main_tex_file=None, selected_t
     # 删除被修改tex文件的\documentclass， \userpackage{sty_file_name}, 包含 mm 的 \usepackage{...} 语句
     remove_documentclass(yourwork_main_tex)
     remove_userpackage_sty_lines(your_work_folder, yourwork_main_tex)
-    remove_userpackage_mm_lines(yourwork_main_tex)
+    remove_userpackage_mm_cm_lines(yourwork_main_tex)
 
     # 删掉\begin{document}上面除了\userpackage和\def之外的行
     remove_lines_before_document(yourwork_main_tex)
@@ -395,6 +397,45 @@ def process_latex_files(source_zip, template_zip, main_tex_file=None, selected_t
     # 如果没有自动生成pdf文件，请使用你的模糊编译latex文件的插件再次对tex文件进行编译
     # 如果有红色错误，请把红色的部分给注释掉，再跑就能成功跑起来了
 
+# -----------------------
+# 从这里开始是pdf preview的内容
+
+# import subprocess 上面已经调用过了
+# import os
+
+def compile_latex(method, main_tex_file):  # 添加 main_tex_file 参数
+    folder_path = os.path.abspath('./converted_result')  # 使用绝对路径
+    tex_filename = main_tex_file  # 直接使用传入的 main_tex_file
+
+    tex_path = os.path.join(folder_path, tex_filename)
+
+    if not os.path.exists(tex_path):
+        return f"Error: {tex_path} not found."
+
+    commands = []
+
+    if method == "pdflatex":
+        commands.append(["pdflatex", "-interaction=nonstopmode", tex_filename])
+    elif method == "xelatex":
+        commands.append(["xelatex", "-interaction=nonstopmode", tex_filename])
+    elif method == "xelatex*2":
+        commands.append(["xelatex", "-interaction=nonstopmode", tex_filename])
+        commands.append(["xelatex", "-interaction=nonstopmode", tex_filename])
+    elif method == "xelatex -> bibtex -> xelatex*2":
+        commands.append(["xelatex", "-interaction=nonstopmode", tex_filename])
+        commands.append(["bibtex", "main"])  # bibtex 只需要 .aux 文件的前缀
+        commands.append(["xelatex", "-interaction=nonstopmode", tex_filename])
+        commands.append(["xelatex", "-interaction=nonstopmode", tex_filename])
+    else:
+        return "Invalid method"
+
+    for cmd in commands:
+        result = subprocess.run(cmd, cwd=folder_path, capture_output=True, text=True)
+        if result.returncode != 0:
+            return f"Error in {cmd[0]}: {result.stderr}"
+
+    pdf_path = os.path.join(folder_path, "main.pdf")
+    return pdf_path if os.path.exists(pdf_path) else "Error: PDF not generated."
 
 
 
