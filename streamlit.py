@@ -12,10 +12,11 @@ import time
 from main import process_latex_files
 from main import compile_latex
 from streamlit_pdf_viewer import pdf_viewer
+from targetTemplateRecCompileMapping import target_template_rec_compile_mapping
 
 # 预设模板文件夹
 TEMPLATE_FOLDER = "./templates"
-MAPPING_FILE = "targetTemplateMainTexMapping.py"
+
 
 def get_available_templates():
     """获取 `./templates` 目录下所有的 .zip 模板文件"""
@@ -66,10 +67,10 @@ def capture_output(func, *args, **kwargs):
     finally:
         sys.stdout = sys.__stdout__  # 还原标准输出
 
-# 更新 targetTemplateMainTexMapping.py 文件
-def add_template_to_mapping(full_template_name, main_tex_name):
+# 更新 Mapping 文件
+def add_template_to_mapping(mapping_file, full_template_name, main_tex_name):
     # 读取现有内容
-    with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+    with open(mapping_file, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     # 查找字典的结尾位置
@@ -78,9 +79,9 @@ def add_template_to_mapping(full_template_name, main_tex_name):
             # 在字典结束符号前插入新的映射
             lines.insert(i, f'    "{full_template_name}": "{main_tex_name}",\n')
             break
-    
+
     # 重新写回文件
-    with open(MAPPING_FILE, "w", encoding="utf-8") as f:
+    with open(mapping_file, "w", encoding="utf-8") as f:
         f.writelines(lines)
 
 def main():
@@ -115,7 +116,8 @@ def main():
 
     # 选择目标模板（从预设模板中选）
     available_templates = get_available_templates()
-    selected_template_name = st.selectbox("选择目标模板", [os.path.splitext(f)[0] for f in available_templates])
+    available_template_names = [os.path.splitext(f)[0] for f in available_templates]
+    selected_template_name = st.selectbox("选择目标模板", available_template_names)
     selected_template = f"{selected_template_name}.zip"
 
     # 触发按钮
@@ -146,6 +148,12 @@ def main():
                 st.error(f"处理过程中发生错误: {e}")
         else:
             st.error("请上传源文件压缩包并选择目标模板")
+
+
+
+
+
+
     st.markdown("---")  # 添加分隔线，使其显示在页面底部
     # 这里开始是pdf review
     # PDF 预览部分始终显示
@@ -157,8 +165,14 @@ def main():
         ["pdflatex", "xelatex", "xelatex*2", "xelatex -> bibtex -> xelatex*2"]
     )
 
+    # 给出推荐的编译方式
+    if selected_template in target_template_rec_compile_mapping:
+        rec_compile_method = target_template_rec_compile_mapping[selected_template]
+        st.write(f"该模板推荐的编译方式为：{rec_compile_method}")
+
     # 只有在 main_tex_file 存在时才允许 PDF 预览
     if st.button("显示 PDF Preview"):
+
         # 每次点击时清空之前的 PDF 缓存
         if "pdf_binary_data" in st.session_state:
             del st.session_state.pdf_binary_data
@@ -214,33 +228,47 @@ def main():
     # 创建一个短输入框，让用户输入模板名称
     template_name = st.text_input("输入模板名称", placeholder="模板名称")  # 仅输入名称
 
+    if template_name:
+        if template_name in available_template_names:
+            st.warning("已有该名称的模板，请更换名称")
+        else:
+            st.success("模板名称可用")
 
     # 让用户输入该模板的主 .tex 文件名称
-    main_tex_name = st.text_input("输入该模板的主 .tex 文件名（包括 .tex 后缀）")
+    main_tex_name = st.text_input("输入该模板的主 .tex 文件名（包括 .tex 后缀）", placeholder="主 .tex 文件名称")
+
+    method_name = st.selectbox(
+        "选择推荐编译方式",
+        ["none", "pdflatex", "xelatex", "xelatex*2", "xelatex -> bibtex -> xelatex*2"]
+    )
 
     if st.button("上传模板"):
-        if uploaded_template and main_tex_name and template_name:
-            # 确保 templates 文件夹存在
-            os.makedirs(TEMPLATE_FOLDER, exist_ok=True)
+        if template_name and template_name not in available_template_names:
+            if uploaded_template and main_tex_name and template_name and method_name:
+                # 确保 templates 文件夹存在
+                os.makedirs(TEMPLATE_FOLDER, exist_ok=True)
 
-            # 拼接完整的模板文件名
-            full_template_name = template_name + ".zip"
+                # 拼接完整的模板文件名
+                full_template_name = template_name + ".zip"
 
-            # 保存 zip 文件到 templates 文件夹
-            template_path = os.path.join(TEMPLATE_FOLDER, full_template_name)
-            with open(template_path, "wb") as f:
-                f.write(uploaded_template.getbuffer())
+                # 保存 zip 文件到 templates 文件夹
+                template_path = os.path.join(TEMPLATE_FOLDER, full_template_name)
+                with open(template_path, "wb") as f:
+                    f.write(uploaded_template.getbuffer())
 
-            # 更新 targetTemplateMainTexMapping.py 文件
-            add_template_to_mapping(full_template_name, main_tex_name)
+                # 更新 targetTemplateMainTexMapping.py 文件
+                add_template_to_mapping("targetTemplateMainTexMapping.py", full_template_name, main_tex_name)
 
-            st.success(f"模板 {full_template_name} 上传成功，主 .tex 文件设为 {main_tex_name}！")
-            st.info("请刷新页面，在下拉菜单中查看新模板。")
+                # 更新 targetTemplateRecCompileMapping 文件
+                add_template_to_mapping("targetTemplateRecCompileMapping.py", full_template_name, method_name)
+
+                st.success(f"模板 {full_template_name} 上传成功，主 .tex 文件设为 {main_tex_name}，推荐编译方式设为 {method_name}！")
+                st.info("请刷新页面，在下拉菜单中查看新模板。")
+            else:
+                st.error("请上传 .zip 文件，并输入模板名称和主 .tex 文件名！")
         else:
-            st.error("请上传 .zip 文件，并输入模板名称和主 .tex 文件名！")
-    
-    # --------------
-    # 这里是pdf preview的部分
+            st.error("请修改模板名称")
+
 
 
 
