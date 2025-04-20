@@ -1,5 +1,3 @@
-# api_service.py
-
 import fastapi
 import uvicorn
 import os
@@ -28,6 +26,15 @@ app = FastAPI(
     title="LaTeX Template Converter API",
     description="API to convert LaTeX projects using predefined templates.",
 )
+
+def detect_main_tex(directory):
+    for root, _, files in os.walk(directory):
+        for f in files:
+            if f.endswith('.tex'):
+                with open(os.path.join(root, f)) as tex_file:
+                    if r'\documentclass' in tex_file.read():
+                        return os.path.relpath(os.path.join(root, f), directory)
+    return None
 
 
 def get_available_templates() -> List[str]:
@@ -90,7 +97,7 @@ def get_tex_files_from_dir(directory: str) -> List[str]:
 
 
 @app.post(
-    "/convert/",
+    "/api/v1/convert",
     summary="Convert LaTeX Source to Target Template",
     description="Upload a source LaTeX project zip, select a target template, "
                 "and optionally specify the main .tex file. Returns the converted project as a zip.",
@@ -101,11 +108,11 @@ async def convert_latex_endpoint(
     template_name: str = Form(..., description="Name of the target template (e.g., 'templateA', without .zip)."),
     main_tex: Optional[str] = Form(None, description="Optional: Name of the main .tex file in the source zip (e.g., 'main.tex', 'document.tex'). If not provided, attempts to auto-detect.")
 ):
-    """
-    Handles the LaTeX conversion request.
-    """
     logging.info(f"Received conversion request for template: '{template_name}'")
-
+    # 添加路径安全检验
+    if main_tex and (os.path.isabs(main_tex) or '..' in main_tex):
+        raise HTTPException(400, "Main tex path contains invalid characters")
+    
     available_templates = get_available_templates()
     if template_name not in available_templates:
         logging.error(f"Template '{template_name}' not found. Available: {available_templates}")
@@ -115,6 +122,8 @@ async def convert_latex_endpoint(
         )
     template_zip_name = f"{template_name}.zip"
     template_zip_path = os.path.join(TEMPLATE_FOLDER, template_zip_name)
+    if not os.path.exists(template_zip_path):
+        raise HTTPException(404, f"Template {template_name} not found")
     logging.info(f"Using template file: {template_zip_path}")
 
     source_temp_dir = None
@@ -140,11 +149,15 @@ async def convert_latex_endpoint(
                 main_tex = tex_files[0]
                 logging.info(f"Auto-detected single main TeX file: {main_tex}")
             else:
-                logging.error(f"Multiple .tex files found, main_tex needs to be specified: {tex_files}")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Multiple .tex files found ({', '.join(tex_files)}). Please specify the main file using the 'main_tex' parameter."
-                )
+                main_tex = detect_main_tex(source_temp_dir)
+                if main_tex:
+                    logging.info(f"Auto-detected main TeX file: {main_tex}")
+                else:
+                    logging.error(f"Multiple .tex files found, main_tex needs to be specified: {tex_files}")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Multiple .tex files found ({', '.join(tex_files)}). Please specify the main file using the 'main_tex' parameter."
+                    )
         else:
              logging.info(f"Using specified main TeX file: {main_tex}")
 
@@ -169,13 +182,17 @@ async def convert_latex_endpoint(
         return FileResponse(
             path=output_zip_path,
             media_type='application/zip',
-            filename=download_filename
+            filename=download_filename,
+            headers={
+                "Content-Disposition": f"attachment; filename={download_filename}",
+                "X-Conversion-Status": "success"
+            }
         )
 
     except HTTPException as e:
         raise e
     except Exception as e:
-        logging.exception("An unexpected error occurred during conversion.") # Log full traceback
+        logging.exception("An unexpected error occurred during conversion.")
         raise HTTPException(status_code=500, detail=f"An internal server error occurred: {e}")
     finally:
         logging.info("Starting cleanup...")
