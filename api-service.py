@@ -109,6 +109,109 @@ def cleanup_file(path: str):
     except Exception as e:
         logging.error(f"Background task: Error removing file {path}: {e}")
 
+# 更新 Mapping 文件
+def add_template_to_mapping(mapping_file, full_template_name, main_tex_name):
+    # 读取现有内容
+    with open(mapping_file, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # 查找字典的结尾位置
+    for i, line in enumerate(lines):
+        if line.strip() == "}":  # 字典的结尾部分
+            # 在字典结束符号前插入新的映射
+            lines.insert(i, f'    "{full_template_name}": "{main_tex_name}",\n')
+            break
+
+    # 重新写回文件
+    with open(mapping_file, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+@app.post(
+    "/api/v1/upload",
+    summary="Upload LaTeX Project",
+    description="Upload a LaTeX project as a ZIP file. Returns the list of .tex files in the project.",
+)
+async def upload_latex_project(
+    template: UploadFile = File(..., description="LaTeX template ZIP file."),
+    template_name: str = Form(..., description="Name for the template (without .zip extension)."),
+    main_tex: str = Form(..., description="Name of the main .tex file in the template (e.g., 'main.tex')."),
+    recommended_compile: str = Form(..., description="Recommended compile method for the template.")
+):
+    logging.info(f"Received template upload request: '{template_name}'")
+    
+    # Check if template name is already used
+    available_templates = get_available_templates()
+    if template_name in available_templates:
+        raise HTTPException(status_code=400, detail=f"Template name '{template_name}' already exists. Please choose a different name.")
+    
+    # Validate the file is a zip
+    if not template.filename.endswith('.zip'):
+        raise HTTPException(status_code=400, detail="Uploaded file must be a ZIP file.")
+    
+    # Validate main_tex path safety
+    if main_tex and (os.path.isabs(main_tex) or '..' in main_tex):
+        raise HTTPException(400, detail="Main tex path contains invalid characters.")
+    
+    temp_dir = None
+    template_zip_path = None
+    
+    try:
+        # Save the uploaded zip temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
+            shutil.copyfileobj(template.file, temp_file)
+            template_zip_path = temp_file.name
+        
+        # Extract to check contents
+        temp_dir = tempfile.mkdtemp()
+        extract_zip(template_zip_path, temp_dir)
+        
+        # Verify the main tex file exists
+        tex_files = get_tex_files_from_dir(temp_dir)
+        if not tex_files:
+            raise HTTPException(status_code=400, detail="No .tex files found in the uploaded template.")
+        
+        if main_tex not in tex_files:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Specified main_tex file '{main_tex}' not found in the template. Available .tex files: {', '.join(tex_files)}"
+            )
+            
+        # Save the template to the templates folder
+        full_template_name = f"{template_name}.zip"
+        template_path = os.path.join(TEMPLATE_FOLDER, full_template_name)
+        shutil.copy(template_zip_path, template_path)
+        
+        # Update the targetTemplateMainTexMapping.py file
+        mapping_file = "targetTemplateMainTexMapping.py"
+        if os.path.exists(mapping_file):
+            add_template_to_mapping(mapping_file, full_template_name, main_tex)
+            
+        # Update the targetTemplateRecCompileMapping.py file
+        compile_mapping_file = "targetTemplateRecCompileMapping.py"
+        if os.path.exists(compile_mapping_file):
+            add_template_to_mapping(compile_mapping_file, full_template_name, recommended_compile)
+            
+        return {
+            "status": "success",
+            "message": f"Template '{template_name}' uploaded successfully",
+            "template_name": template_name,
+            "main_tex": main_tex,
+            "recommended_compile": recommended_compile
+        }
+        
+    except Exception as e:
+        logging.error(f"Error processing template upload: {e}")
+        raise HTTPException(status_code=500, detail=f"Error uploading template: {str(e)}")
+    
+    finally:
+        # Clean up temporary files
+        if temp_dir and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            
+        if template_zip_path and os.path.exists(template_zip_path):
+            os.remove(template_zip_path)
+
+
 @app.post(
     "/api/v1/convert",
     summary="Convert LaTeX Source to Target Template",
