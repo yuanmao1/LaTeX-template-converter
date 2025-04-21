@@ -1,5 +1,3 @@
-# streamlit run api_test_client.py
-
 import streamlit as st
 import requests
 import tempfile

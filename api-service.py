@@ -5,7 +5,7 @@ import zipfile
 import tempfile
 import shutil
 import logging
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from typing import Optional, List
 
@@ -36,7 +36,12 @@ def detect_main_tex(directory):
                         return os.path.relpath(os.path.join(root, f), directory)
     return None
 
-
+@app.get(
+    "/api/v1/templates",
+    summary="Get Available Templates",
+    description="Returns a list of available LaTeX templates.",
+    response_description="A list of available LaTeX template names."
+)
 def get_available_templates() -> List[str]:
     """Gets available template names (without .zip extension)"""
     try:
@@ -94,7 +99,15 @@ def get_tex_files_from_dir(directory: str) -> List[str]:
         logging.error(f"Error scanning for .tex files in {directory}: {e}")
         return []
 
-
+def cleanup_file(path: str):
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+            logging.info(f"Background task: Successfully removed temporary file: {path}")
+        else:
+            logging.warning(f"Background task: File not found or already removed: {path}")
+    except Exception as e:
+        logging.error(f"Background task: Error removing file {path}: {e}")
 
 @app.post(
     "/api/v1/convert",
@@ -104,6 +117,7 @@ def get_tex_files_from_dir(directory: str) -> List[str]:
     response_description="A ZIP file containing the converted LaTeX project."
 )
 async def convert_latex_endpoint(
+    background_tasks: BackgroundTasks,
     source: UploadFile = File(..., description="Source LaTeX project as a ZIP file."),
     template_name: str = Form(..., description="Name of the target template (e.g., 'templateA', without .zip)."),
     main_tex: Optional[str] = Form(None, description="Optional: Name of the main .tex file in the source zip (e.g., 'main.tex', 'document.tex'). If not provided, attempts to auto-detect.")
@@ -139,25 +153,31 @@ async def convert_latex_endpoint(
         if not main_tex:
             logging.info("Main TeX file not specified, attempting auto-detection.")
             source_temp_dir = tempfile.mkdtemp()
-            extract_zip(source_zip_temp_file, source_temp_dir)
-            tex_files = get_tex_files_from_dir(source_temp_dir)
+            try: # 添加 try...finally 来确保 source_temp_dir 在出错时也能清理
+                extract_zip(source_zip_temp_file, source_temp_dir)
+                tex_files = get_tex_files_from_dir(source_temp_dir)
 
-            if not tex_files:
-                logging.error("No .tex files found in the uploaded source zip.")
-                raise HTTPException(status_code=400, detail="No .tex files found in the source ZIP.")
-            elif len(tex_files) == 1:
-                main_tex = tex_files[0]
-                logging.info(f"Auto-detected single main TeX file: {main_tex}")
-            else:
-                main_tex = detect_main_tex(source_temp_dir)
-                if main_tex:
-                    logging.info(f"Auto-detected main TeX file: {main_tex}")
+                if not tex_files:
+                    logging.error("No .tex files found in the uploaded source zip.")
+                    raise HTTPException(status_code=400, detail="No .tex files found in the source ZIP.")
+                elif len(tex_files) == 1:
+                    main_tex = tex_files[0]
+                    logging.info(f"Auto-detected single main TeX file: {main_tex}")
                 else:
-                    logging.error(f"Multiple .tex files found, main_tex needs to be specified: {tex_files}")
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Multiple .tex files found ({', '.join(tex_files)}). Please specify the main file using the 'main_tex' parameter."
-                    )
+                    main_tex = detect_main_tex(source_temp_dir)
+                    if main_tex:
+                        logging.info(f"Auto-detected main TeX file: {main_tex}")
+                    else:
+                        logging.error(f"Multiple .tex files found, main_tex needs to be specified: {tex_files}")
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Multiple .tex files found ({', '.join(tex_files)}). Please specify the main file using the 'main_tex' parameter."
+                        )
+            finally:
+                if source_temp_dir and os.path.exists(source_temp_dir):
+                    logging.info(f"Removing temporary extraction directory: {source_temp_dir}")
+                    shutil.rmtree(source_temp_dir)
+                    source_temp_dir = None # 标记为已清理
         else:
              logging.info(f"Using specified main TeX file: {main_tex}")
 
@@ -168,7 +188,7 @@ async def convert_latex_endpoint(
             source_zip=source_zip_temp_file,
             template_zip=template_zip_path,
             main_tex_file=main_tex,
-            selected_template=template_zip_name
+            selected_template=template_zip_name # 注意：这里之前是 template_zip_name，确认是否正确
         )
 
         if not output_zip_path or not os.path.exists(output_zip_path):
@@ -179,6 +199,9 @@ async def convert_latex_endpoint(
 
         download_filename = f"converted_{source.filename.replace('.zip', '')}_using_{template_name}.zip"
 
+        # 添加后台任务来删除 output_zip_path
+        background_tasks.add_task(cleanup_file, output_zip_path)
+
         return FileResponse(
             path=output_zip_path,
             media_type='application/zip',
@@ -187,23 +210,34 @@ async def convert_latex_endpoint(
                 "Content-Disposition": f"attachment; filename={download_filename}",
                 "X-Conversion-Status": "success"
             }
+            # 注意：FileResponse 自身也有 background 参数，但使用注入的 background_tasks 更灵活
+            # background=BackgroundTask(cleanup_file, path=output_zip_path) # 另一种方式
         )
 
     except HTTPException as e:
+        # 如果 output_zip_path 在异常发生前已生成，也需要清理
+        if output_zip_path and os.path.exists(output_zip_path):
+             cleanup_file(output_zip_path) # 直接清理，因为不会返回 FileResponse
         raise e
     except Exception as e:
         logging.exception("An unexpected error occurred during conversion.")
+        # 如果 output_zip_path 在异常发生前已生成，也需要清理
+        if output_zip_path and os.path.exists(output_zip_path):
+             cleanup_file(output_zip_path) # 直接清理
         raise HTTPException(status_code=500, detail=f"An internal server error occurred: {e}")
     finally:
-        logging.info("Starting cleanup...")
+        logging.info("Starting final cleanup (source files)...")
+        # 清理临时的源 zip 文件
         if source_zip_temp_file and os.path.exists(source_zip_temp_file):
             logging.info(f"Removing temporary source zip: {source_zip_temp_file}")
             os.remove(source_zip_temp_file)
+        # 确保临时的解压目录也被清理 (如果之前没有清理)
         if source_temp_dir and os.path.exists(source_temp_dir):
-             logging.info(f"Removing temporary extraction directory: {source_temp_dir}")
+             logging.info(f"Removing temporary extraction directory (final check): {source_temp_dir}")
              shutil.rmtree(source_temp_dir)
+        # 注意：output_zip_path 的清理现在由后台任务处理，不再需要在 finally 中处理
 
-        logging.info("Cleanup finished.")
+        logging.info("Final cleanup finished.")
 
 
 if __name__ == "__main__":
