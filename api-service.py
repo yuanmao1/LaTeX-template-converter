@@ -61,6 +61,10 @@ def extract_zip(zip_file_path: str, target_dir: str):
     """Extracts ZIP file to a target directory, removing __MACOSX."""
     try:
         with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
+            for member in zip_ref.namelist():
+                member_path = os.path.abspath(os.path.join(target_dir, member))
+                if not member_path.startswith(os.path.abspath(target_dir)):
+                    raise HTTPException(status_code=400, detail="Unsafe file path in zip.")
             zip_ref.extractall(target_dir)
 
         macosx_folder = os.path.join(target_dir, '__MACOSX')
@@ -125,7 +129,8 @@ def add_template_to_mapping(mapping_file, full_template_name, main_tex_name):
     # 重新写回文件
     with open(mapping_file, "w", encoding="utf-8") as f:
         f.writelines(lines)
-
+        
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 @app.post(
     "/api/v1/upload",
     summary="Upload LaTeX Project",
@@ -156,16 +161,28 @@ async def upload_latex_project(
     template_zip_path = None
     
     try:
-        # Save the uploaded zip temporarily
+        size = 0
         with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as temp_file:
-            shutil.copyfileobj(template.file, temp_file)
+            # shutil.copyfileobj(template.file, temp_file)
+            while True:
+                chunk = await template.read(1024 * 1024) # 一次读取1MB
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_FILE_SIZE:
+                    temp_file.close()
+                    os.remove(temp_file.name)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File size exceeds the limit of {MAX_FILE_SIZE / (1024 * 1024)} MB."
+                    )
+                temp_file.write(chunk)
+            temp_file.flush() # 确保数据写入磁盘
             template_zip_path = temp_file.name
         
-        # Extract to check contents
         temp_dir = tempfile.mkdtemp()
         extract_zip(template_zip_path, temp_dir)
         
-        # Verify the main tex file exists
         tex_files = get_tex_files_from_dir(temp_dir)
         if not tex_files:
             raise HTTPException(status_code=400, detail="No .tex files found in the uploaded template.")
@@ -176,7 +193,6 @@ async def upload_latex_project(
                 detail=f"Specified main_tex file '{main_tex}' not found in the template. Available .tex files: {', '.join(tex_files)}"
             )
             
-        # Save the template to the templates folder
         full_template_name = f"{template_name}.zip"
         template_path = os.path.join(TEMPLATE_FOLDER, full_template_name)
         shutil.copy(template_zip_path, template_path)
